@@ -19,7 +19,7 @@ import { executeJitoTx } from "./utils/jito";
 import { GRPC_ENDPOINT, PUMPFUN_PROGRAM_ID, RARDIUM_PROGRAM_ID, SOL_MINT, TARGET_ADDRESS, RPC_ENDPOINT, PHOTON_PROGRAM_ID, METEORA_PROGRAM_ID } from "./constants"
 import { logger } from "./utils";
 import { buyTokenPumpfun } from "./pumpfun/transaction/buyTokenPump";
-import sellTokenPumpfun from "./pumpfun/transaction/sellTokenPump";
+import sellTokenPumpfun, { sellWithJupiter } from "./pumpfun/transaction/sellTokenPump";
 
 dotenv.config()
 
@@ -40,7 +40,7 @@ const title = `
                                   ╚██╗    ╚██████╔╝    ██║  ██║    ██║         ╚██████╗    ██╔╝
                                    ╚═╝     ╚═════╝     ╚═╝  ╚═╝    ╚═╝          ╚═════╝    ╚═╝ 
                                                                                                                                                             
--------------------------------------------------------- Version 3.0 --------------------------------------------------------
+-------------------------------------------------------- Version 1.0 --------------------------------------------------------
 
 `;
 
@@ -142,7 +142,7 @@ let isStopped = false;
 
 async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<SubscribeRequest, SubscribeUpdate>) {
 
-    isStopped = true;
+
     if (isStopped) {
         return; // Skip processing if the stream is stopped
     }
@@ -170,7 +170,7 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
 
 
         if (transaction.meta?.logMessages.map(str => str.includes(PUMPFUN_PROGRAM_ID)).includes(true)) {
-
+            isStopped = true;
             console.log("======================== Pumpfun trading transaction ======================== ");
 
             if (transaction.meta?.logMessages.map(str => str.includes("Buy")).includes(true)) {
@@ -181,10 +181,6 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                     saveToJSONFile("Pump-buy.json", data);
 
                     let solPumpfunBuyAmount = (Number(transaction.meta.postBalances[3]) - Number(transaction.meta.preBalances[3])) / (10 ** 9);
-
-                    // let mintAddress = transaction.meta.preTokenBalances[0].mint;
-                    // console.log("solPumpfunBuyAmount=>", solPumpfunBuyAmount);
-                    // console.log("mintaddress=>", mintAddress);
 
 
                     const mintAddress = transaction.meta.preTokenBalances.find(
@@ -216,41 +212,6 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                     console.log("Fail buy token in Pumpfun")
                 }
 
-            } else if (transaction.meta?.logMessages.map(str => str.includes("Sell")).includes(true)) {
-
-                try {
-
-                    console.log("======================== Sell token transaction to Pumpfun ======================== ")
-                    saveToJSONFile("Pump-sell.json", data);
-
-                    const mintAddress = transaction.meta.preTokenBalances[0]?.mint;
-                    console.log("mintAddress===>", mintAddress)
-
-                    const preBalance = transaction.meta?.preTokenBalances.find(
-                        (b) => b.mint == mintAddress && b.owner == TARGET_ADDRESS
-                    )?.uiTokenAmount?.uiAmount || 0;
-
-                    const postBalance = transaction.meta?.postTokenBalances?.find(
-                        (b) => b.mint == mintAddress && b.owner == TARGET_ADDRESS
-                    )?.uiTokenAmount?.uiAmount || 0;
-
-                    const tokenPumpfunSellAmount = preBalance - postBalance;
-
-                    console.log("tokenPumpfunSellAmount============>", tokenPumpfunSellAmount);
-
-                    let sellPumpfunResult = await sellTokenPumpfun(new PublicKey(mintAddress), tokenPumpfunSellAmount)
-                    // if (sellPumpfunResult) {
-                    //     console.log("Success sell token in Pumpfun")
-
-                    // } else {
-
-                    await sellWithJupiter(new PublicKey(mintAddress));
-                    // }
-                } catch (error) {
-                    console.log(error)
-                    console.log("Fail sell token in Pumpfun")
-                }
-
             }
         } else if (transaction.meta?.logMessages.map(str => str.includes(PHOTON_PROGRAM_ID)).includes(true)) {
 
@@ -279,43 +240,11 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                     console.log("Fail buy token in Pumpfun")
                 }
 
-            } else if (transaction.meta?.logMessages.map(str => str.includes("Sell")).includes(true)) {
-
-                try {
-
-                    console.log("======================== Sell token transaction to Photon ======================== ")
-                    saveToJSONFile("Photon-sell.json", data);
-
-                    const mintAddress = transaction.meta.preTokenBalances[0]?.mint;
-                    console.log("mintAddress===>", mintAddress)
-
-                    const preBalance = transaction.meta?.preTokenBalances.find(
-                        (b) => b.mint == mintAddress && b.owner == TARGET_ADDRESS
-                    )?.uiTokenAmount?.uiAmount || 0;
-
-                    const postBalance = transaction.meta?.postTokenBalances?.find(
-                        (b) => b.mint == mintAddress && b.owner == TARGET_ADDRESS
-                    )?.uiTokenAmount?.uiAmount || 0;
-
-                    const tokenPumpfunSellAmount = preBalance - postBalance;
-
-                    console.log("tokenPumpfunSellAmount============>", tokenPumpfunSellAmount);
-
-                    let sellPumpfunResult = await sellTokenPumpfun(new PublicKey(mintAddress), tokenPumpfunSellAmount)
-                    // if (sellPumpfunResult) {
-                    //     console.log("Success sell token in Pumpfun")
-
-                    // } else {
-
-                    await sellWithJupiter(new PublicKey(mintAddress));
-                    // }
-                } catch (error) {
-                    console.log(error)
-                    console.log("Fail sell token in Pumpfun")
-                }
-
             }
         }
+
+
+
 
 
     } catch (error) {
