@@ -12,14 +12,16 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import { convertBuffers } from "./utils/geyser";
 // import { JUP_AGGREGATOR, USDC_MINT_ADDRESS } from "./constants";
-import { getAssociatedTokenAddress, NATIVE_MINT } from "@solana/spl-token";
+import { getAssociatedTokenAddress, getAccount, NATIVE_MINT } from "@solana/spl-token";
 import { getBuyTxWithJupiter, getSellTxWithJupiter } from "./utils/swapOnlyAmm";
 import { execute, getTokenMarketCap } from "./utils/legacy";
 import { executeJitoTx } from "./utils/jito";
-import { GRPC_ENDPOINT, PUMPFUN_PROGRAM_ID, RARDIUM_PROGRAM_ID, SOL_MINT, TARGET_ADDRESS, RPC_ENDPOINT, PHOTON_PROGRAM_ID, METEORA_PROGRAM_ID } from "./constants"
+import { GRPC_ENDPOINT, PUMPFUN_PROGRAM_ID, RARDIUM_PROGRAM_ID, SOL_MINT, TARGET_ADDRESS, RPC_ENDPOINT, PHOTON_PROGRAM_ID, METEORA_PROGRAM_ID, BUY_LIMIT } from "./constants"
 import { logger } from "./utils";
 import { buyTokenPumpfun } from "./pumpfun/transaction/buyTokenPump";
 import sellTokenPumpfun, { sellWithJupiter } from "./pumpfun/transaction/sellTokenPump";
+import sellToken from "./pumpfun/transaction/sellToken";
+import { sleep } from "./pumpfun/src/utils";
 
 dotenv.config()
 
@@ -174,7 +176,8 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
             console.log("======================== Pumpfun trading transaction ======================== ");
 
             if (transaction.meta?.logMessages.map(str => str.includes("Buy")).includes(true)) {
-
+                let buySolAmount;
+                let tokenMint;
                 try {
 
                     console.log("======================== Buy token transaction from Pumpfun ======================== ")
@@ -203,22 +206,59 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
 
                     let buyPumpfunResult = await buyTokenPumpfun(new PublicKey(mintAddress), solPumpfunBuyAmount);
 
-                    // if (buyPumpfunResult) {
-                    //     console.log("Success buy token in Pumpfun")
-                    // }
+
+                    buySolAmount = BUY_LIMIT;
+                    tokenMint = mintAddress
+                    try {
+
+                        const tokenAta = await getAssociatedTokenAddress(tokenMint, keyPair.publicKey);
+                        const tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
+                        console.log("🚀 ~ tokenInfo:", tokenAccountInfo);
+                        console.log("🚀 ~ tokenBalance:", tokenAccountInfo.amount);
+
+                        if (Number(tokenAccountInfo?.amount) !== 0) {
+                            console.log("Token balance is updated successfully", '\n');
+
+                            //start sell function
+                            let buyPrice = Number(buySolAmount) / Number(tokenAccountInfo.amount);
+                            let sellTokenSig = await sellToken(tokenMint, buyPrice);
+                            console.log("sellSig====>", sellTokenSig, '\n')
+                            if (sellTokenSig) {
+                                await sleep(2000);
+                            }
+                            else {
+                                await sellToken(tokenMint, buyPrice);
+                                await sellWithJupiter(tokenMint)
+
+                            }
+                            // isStopped = false;
+
+                            return true; // Token balance is updated successfully
+
+                        } else {
+                            console.log("Token balance is not updated", '\n');
+                            return false; // Token balance is not updated
+                        }
+
+
+                    } catch (error) {
+                        console.log(error)
+                        console.log("Fail buy token in Pumpfun")
+                    }
 
                 } catch (error) {
-                    console.log(error)
-                    console.log("Fail buy token in Pumpfun")
+                    console.log(error);
                 }
-
             }
-        } else if (transaction.meta?.logMessages.map(str => str.includes(PHOTON_PROGRAM_ID)).includes(true)) {
-
+            isStopped = false;
+        }
+        else if (transaction.meta?.logMessages.map(str => str.includes(PHOTON_PROGRAM_ID)).includes(true)) {
+            isStopped = true;
             console.log("======================== Photon trading transaction ======================== ");
 
             if (transaction.meta?.logMessages.map(str => str.includes("Buy")).includes(true)) {
-
+                let buySolAmount;
+                let tokenMint;
                 try {
 
                     console.log("======================== Buy token transaction from Photon ======================== ")
@@ -235,17 +275,53 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                         console.log("Success buy token in Pumpfun")
                     }
 
+                    buySolAmount = BUY_LIMIT;
+                    tokenMint = mintAddress
+                    try {
+
+                        const tokenAta = await getAssociatedTokenAddress(tokenMint, keyPair.publicKey);
+                        const tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
+                        console.log("🚀 ~ tokenInfo:", tokenAccountInfo);
+                        console.log("🚀 ~ tokenBalance:", tokenAccountInfo.amount);
+
+                        if (Number(tokenAccountInfo?.amount) !== 0) {
+                            console.log("Token balance is updated successfully", '\n');
+
+                            //start sell function
+                            let buyPrice = Number(buySolAmount) / Number(tokenAccountInfo.amount);
+                            let sellTokenSig = await sellToken(tokenMint, buyPrice);
+                            console.log("sellSig====>", sellTokenSig, '\n')
+                            if (sellTokenSig) {
+                                await sleep(2000);
+                            }
+                            else {
+                                await sellToken(tokenMint, buyPrice);
+                                await sellWithJupiter(tokenMint)
+
+                            }
+                            // isStopped = false;
+
+                            return true; // Token balance is updated successfully
+
+                        } else {
+                            console.log("Token balance is not updated", '\n');
+                            return false; // Token balance is not updated
+                        }
+
+
+                    } catch (error) {
+                        console.log(error)
+                        console.log("Fail buy token in Pumpfun")
+                    }
+
                 } catch (error) {
                     console.log(error)
                     console.log("Fail buy token in Pumpfun")
                 }
 
             }
+            isStopped = false;
         }
-
-
-
-
 
     } catch (error) {
         console.log(error)
