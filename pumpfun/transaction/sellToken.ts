@@ -8,6 +8,7 @@ import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import { sendAndConfirmTransaction } from "@solana/web3.js";
 import base58 from "bs58";
 import { executeJitoTx } from "../../utils/jito";
+import { logger } from "../../utils";
 
 dotenv.config()
 
@@ -49,7 +50,7 @@ async function sellToken(mint: PublicKey, buyPrice: number) {
             const priceChange = ((price - buyPrice) / buyPrice) * 100;
             console.log("priceChange =====>", priceChange);
 
-            console.log(`Current price: ${price}, Buy price: ${buyPrice}, Price change: ${priceChange.toFixed(3)}%`);
+            logger.info(`Current price: ${price}, Buy price: ${buyPrice}, Price change: ${priceChange.toFixed(3)}%`);
 
             if (priceChange >= take_profit) {
                 console.log("Take profit condition met");
