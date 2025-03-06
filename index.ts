@@ -16,7 +16,7 @@ import { getAssociatedTokenAddress, getAccount, NATIVE_MINT } from "@solana/spl-
 import { getBuyTxWithJupiter, getSellTxWithJupiter } from "./utils/swapOnlyAmm";
 import { execute, getTokenMarketCap } from "./utils/legacy";
 import { executeJitoTx } from "./utils/jito";
-import { GRPC_ENDPOINT, PUMPFUN_PROGRAM_ID, RARDIUM_PROGRAM_ID, SOL_MINT, TARGET_ADDRESS, RPC_ENDPOINT, PHOTON_PROGRAM_ID, METEORA_PROGRAM_ID, BUY_LIMIT } from "./constants"
+import { GRPC_ENDPOINT, PUMPFUN_PROGRAM_ID, RARDIUM_PROGRAM_ID, SOL_MINT, TARGET_ADDRESS, RPC_ENDPOINT, PHOTON_PROGRAM_ID, METEORA_PROGRAM_ID, BUY_LIMIT, MAX_RETRY } from "./constants"
 import { logger } from "./utils";
 import { buyTokenPumpfun } from "./pumpfun/transaction/buyTokenPump";
 import sellTokenPumpfun, { sellWithJupiter } from "./pumpfun/transaction/sellTokenPump";
@@ -211,10 +211,41 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                     tokenMint = mintAddress
                     try {
 
-                        const tokenAta = await getAssociatedTokenAddress(tokenMint, keyPair.publicKey);
-                        const tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
-                        console.log("🚀 ~ tokenInfo:", tokenAccountInfo);
-                        console.log("🚀 ~ tokenBalance:", tokenAccountInfo.amount);
+                        let tokenAccountInfo: any;
+                        const maxRetries = MAX_RETRY;
+                        const delayBetweenRetries = 20; // 20m seconds delay between retries
+
+                        logger.info('Start get token ata');
+                        const tokenAta = await getAssociatedTokenAddress(tokenMint, keyPair.publicKey, false);
+                        logger.info('Finish get token ata');
+
+                        for (let attempt = 0; attempt < maxRetries; attempt++) {
+                            try {
+                                tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
+                                break; // Break the loop if fetching the account was successful
+                            } catch (error) {
+                                if (error instanceof Error && error.name === 'TokenAccountNotFoundError') {
+                                    logger.info(`Attempt ${attempt + 1}/${maxRetries}: Associated token account not found, retrying...`);
+                                    if (attempt === maxRetries - 1) {
+                                        logger.error(`Max retries reached. Failed to fetch the token account.`);
+                                        throw error;
+                                    }
+                                    // Wait before retrying
+                                    await new Promise((resolve) => setTimeout(resolve, delayBetweenRetries));
+                                } else if (error instanceof Error) {
+                                    logger.error(`Unexpected error while fetching token account: ${error.message}`);
+                                    throw error;
+                                } else {
+                                    logger.error(`An unknown error occurred: ${String(error)}`);
+                                    throw error;
+                                }
+                            }
+                        }
+
+                        // const tokenAta = await getAssociatedTokenAddress(tokenMint, keyPair.publicKey);
+                        // const tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
+                        // console.log("🚀 ~ tokenInfo:", tokenAccountInfo);
+                        // console.log("🚀 ~ tokenBalance:", tokenAccountInfo.amount);
 
                         if (Number(tokenAccountInfo?.amount) !== 0) {
                             console.log("Token balance is updated successfully", '\n');
@@ -243,11 +274,12 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
 
                     } catch (error) {
                         console.log(error)
-                        console.log("Fail buy token in Pumpfun")
+                        console.log("--------------------- Pumpfun transactio fail ---------------------")
                     }
 
                 } catch (error) {
                     console.log(error);
+                    console.log("--------------------- Pumpfun transactio fail ---------------------")
                 }
             }
             isStopped = false;
@@ -311,12 +343,12 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
 
                     } catch (error) {
                         console.log(error)
-                        console.log("Fail buy token in Pumpfun")
+                        console.log("--------------------- Pumpfun transactio fail ---------------------")
                     }
 
                 } catch (error) {
                     console.log(error)
-                    console.log("Fail buy token in Pumpfun")
+                    console.log("--------------------- Pumpfun transactio fail ---------------------")
                 }
 
             }
