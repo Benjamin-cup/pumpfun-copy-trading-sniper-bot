@@ -45,6 +45,7 @@ async function sellToken(mint: PublicKey, buyPrice: number) {
     while (true) {
         try {
             price = await getSellPrice(mint);
+            console.log("token price after buy==>", price);
             const priceChange = ((price - buyPrice) / buyPrice) * 100;
             console.log("priceChange =====>", priceChange);
 
@@ -198,7 +199,7 @@ const makeSellIx = async (kp: Keypair, sellAmount: number, mint: PublicKey) => {
     return sellIx
 }
 
-const getSellPrice = async (mint: PublicKey) => {
+export const getSellPrice = async (mint: PublicKey) => {
     try {
         let bondingCurveAccount = await sdk.getBondingCurveAccount(mint, "processed");
         console.log("bondingCurveAccount==============>", bondingCurveAccount)
