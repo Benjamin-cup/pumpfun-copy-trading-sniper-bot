@@ -216,7 +216,7 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                         const delayBetweenRetries = 20; // 20m seconds delay between retries
 
                         logger.info('Start get token ata');
-                        const tokenAta = await getAssociatedTokenAddress(tokenMint, keyPair.publicKey, false);
+                        const tokenAta = await getAssociatedTokenAddress(new PublicKey(tokenMint), keyPair.publicKey, false);
                         logger.info('Finish get token ata');
 
                         for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -252,14 +252,14 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
 
                             //start sell function
                             let buyPrice = Number(buySolAmount) / Number(tokenAccountInfo.amount);
-                            let sellTokenSig = await sellToken(tokenMint, buyPrice);
+                            let sellTokenSig = await sellToken(new PublicKey(tokenMint), buyPrice);
                             console.log("sellSig====>", sellTokenSig, '\n')
                             if (sellTokenSig) {
                                 await sleep(2000);
                             }
                             else {
-                                await sellToken(tokenMint, buyPrice);
-                                await sellWithJupiter(tokenMint)
+                                await sellToken(new PublicKey(tokenMint), buyPrice);
+                                await sellWithJupiter(new PublicKey(tokenMint))
 
                             }
                             // isStopped = false;
@@ -311,7 +311,7 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                     tokenMint = mintAddress
                     try {
 
-                        const tokenAta = await getAssociatedTokenAddress(tokenMint, keyPair.publicKey);
+                        const tokenAta = await getAssociatedTokenAddress(new PublicKey(tokenMint), keyPair.publicKey);
                         const tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
                         console.log("🚀 ~ tokenInfo:", tokenAccountInfo);
                         console.log("🚀 ~ tokenBalance:", tokenAccountInfo.amount);
@@ -321,14 +321,14 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
 
                             //start sell function
                             let buyPrice = Number(buySolAmount) / Number(tokenAccountInfo.amount);
-                            let sellTokenSig = await sellToken(tokenMint, buyPrice);
+                            let sellTokenSig = await sellToken(new PublicKey(tokenMint), buyPrice);
                             console.log("sellSig====>", sellTokenSig, '\n')
                             if (sellTokenSig) {
                                 await sleep(2000);
                             }
                             else {
-                                await sellToken(tokenMint, buyPrice);
-                                await sellWithJupiter(tokenMint)
+                                await sellToken(new PublicKey(tokenMint), buyPrice);
+                                await sellWithJupiter(new PublicKey(tokenMint))
 
                             }
                             // isStopped = false;
