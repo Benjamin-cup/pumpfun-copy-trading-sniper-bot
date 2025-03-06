@@ -20,7 +20,7 @@ import { GRPC_ENDPOINT, PUMPFUN_PROGRAM_ID, RARDIUM_PROGRAM_ID, SOL_MINT, TARGET
 import { logger } from "./utils";
 import { buyTokenPumpfun } from "./pumpfun/transaction/buyTokenPump";
 import sellTokenPumpfun, { sellWithJupiter } from "./pumpfun/transaction/sellTokenPump";
-import sellToken from "./pumpfun/transaction/sellToken";
+import sellToken, { getSellPrice } from "./pumpfun/transaction/sellToken";
 import { sleep } from "./pumpfun/src/utils";
 
 dotenv.config()
@@ -204,10 +204,13 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                     }
                     console.log("mintAddress===>", mintAddress);
 
+                    let solBalanceBeforeBuy = await solanaConnection.getBalance(keyPair.publicKey);
+
                     let buyPumpfunResult = await buyTokenPumpfun(new PublicKey(mintAddress), solPumpfunBuyAmount);
 
+                    let solBalanceAfterBuy = await solanaConnection.getBalance(keyPair.publicKey);
 
-                    buySolAmount = BUY_LIMIT;
+                    buySolAmount = (solBalanceBeforeBuy - solBalanceAfterBuy - (0.000105 + 0.000005 + 0.00203928 + 0.00001003) * 10 ** 9);
                     tokenMint = mintAddress
                     try {
 
@@ -249,6 +252,7 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
 
                         if (Number(tokenAccountInfo?.amount) !== 0) {
                             console.log("Token balance is updated successfully", '\n');
+                            console.log("Token price after buy===>", tokenAccountInfo.amount)
 
                             //start sell function
                             let buyPrice = Number(buySolAmount) / Number(tokenAccountInfo.amount);
@@ -262,7 +266,7 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                                 await sellWithJupiter(new PublicKey(tokenMint))
 
                             }
-                            // isStopped = false;
+                            isStopped = false;
 
                             return true; // Token balance is updated successfully
 
@@ -301,20 +305,55 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                     let mintAddress = transaction.meta.preTokenBalances[0].mint;
                     console.log("solPumpfunBuyAmount=>", solPumpfunBuyAmount);
                     console.log("mintaddress=>", mintAddress);
+
+
+                    let solBalanceBeforeBuy = await solanaConnection.getBalance(keyPair.publicKey);
+
                     let buyPumpfunResult = await buyTokenPumpfun(new PublicKey(mintAddress), solPumpfunBuyAmount);
 
-                    if (buyPumpfunResult) {
-                        console.log("Success buy token in Pumpfun")
-                    }
+                    let solBalanceAfterBuy = await solanaConnection.getBalance(keyPair.publicKey);
 
-                    buySolAmount = BUY_LIMIT;
+                    buySolAmount = (solBalanceBeforeBuy - solBalanceAfterBuy - (0.000105 + 0.000005 + 0.00203928 + 0.00001003) * 10 ** 9);
                     tokenMint = mintAddress
                     try {
 
-                        const tokenAta = await getAssociatedTokenAddress(new PublicKey(tokenMint), keyPair.publicKey);
-                        const tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
-                        console.log("🚀 ~ tokenInfo:", tokenAccountInfo);
-                        console.log("🚀 ~ tokenBalance:", tokenAccountInfo.amount);
+
+                        let tokenAccountInfo: any;
+                        const maxRetries = MAX_RETRY;
+                        const delayBetweenRetries = 20; // 20m seconds delay between retries
+
+                        logger.info('Start get token ata');
+                        const tokenAta = await getAssociatedTokenAddress(new PublicKey(tokenMint), keyPair.publicKey, false);
+                        logger.info('Finish get token ata');
+
+                        for (let attempt = 0; attempt < maxRetries; attempt++) {
+                            try {
+                                tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
+                                break; // Break the loop if fetching the account was successful
+                            } catch (error) {
+                                if (error instanceof Error && error.name === 'TokenAccountNotFoundError') {
+                                    logger.info(`Attempt ${attempt + 1}/${maxRetries}: Associated token account not found, retrying...`);
+                                    if (attempt === maxRetries - 1) {
+                                        logger.error(`Max retries reached. Failed to fetch the token account.`);
+                                        throw error;
+                                    }
+                                    // Wait before retrying
+                                    await new Promise((resolve) => setTimeout(resolve, delayBetweenRetries));
+                                } else if (error instanceof Error) {
+                                    logger.error(`Unexpected error while fetching token account: ${error.message}`);
+                                    throw error;
+                                } else {
+                                    logger.error(`An unknown error occurred: ${String(error)}`);
+                                    throw error;
+                                }
+                            }
+                        }
+
+
+                        // const tokenAta = await getAssociatedTokenAddress(new PublicKey(tokenMint), keyPair.publicKey);
+                        // const tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
+                        // console.log("🚀 ~ tokenInfo:", tokenAccountInfo);
+                        // console.log("🚀 ~ tokenBalance:", tokenAccountInfo.amount);
 
                         if (Number(tokenAccountInfo?.amount) !== 0) {
                             console.log("Token balance is updated successfully", '\n');

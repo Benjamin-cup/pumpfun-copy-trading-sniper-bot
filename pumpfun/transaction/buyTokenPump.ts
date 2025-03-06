@@ -15,6 +15,7 @@ import dotenv from 'dotenv'
 import { executeJitoTx } from "../utils/jito";
 import { logger } from "../../utils";
 import { executeJitoTx1 } from "../../utils/selljito";
+import { getSellPrice } from "./sellToken";
 dotenv.config()
 
 
@@ -163,6 +164,11 @@ export async function buyTokenPumpfun(
         versionedTx.sign([keypair]);
         console.log(await solanaConnection.simulateTransaction(versionedTx, { sigVerify: true }))
         logger.info('Finish building buy transaction ');
+
+
+        // get token Price
+        let currentSolPrice = await getSellPrice(new PublicKey(mint))
+        console.log("Token price before buy=====>", currentSolPrice);
 
         logger.info('Start send and confirm buy transaction ');
 
