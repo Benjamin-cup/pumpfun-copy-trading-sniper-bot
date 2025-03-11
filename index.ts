@@ -22,7 +22,7 @@ import { buyTokenPumpfun } from "./pumpfun/transaction/buyTokenPump";
 import sellTokenPumpfun, { sellWithJupiter } from "./pumpfun/transaction/sellTokenPump";
 import sellToken, { getSellPrice } from "./pumpfun/transaction/sellToken";
 import { sleep } from "./pumpfun/src/utils";
-
+import { sellAllToken } from "./utils/gatherrefer";
 dotenv.config()
 
 
@@ -149,7 +149,7 @@ function handleStreamEvents(stream: ClientDuplexStream<SubscribeRequest, Subscri
 
 
 let isStopped = false;
-
+const boughtTokens: string[] = [];
 async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<SubscribeRequest, SubscribeUpdate>) {
 
 
@@ -204,6 +204,12 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
 
                     if (!mintAddress) {
                         console.log("No valid token mint address found.");
+                        return;
+                    }
+
+                    // **Check if the token has already been bought**
+                    if (boughtTokens.includes(mintAddress)) {
+                        console.log(`Skipping buy. Already purchased token: ${mintAddress}`);
                         return;
                     }
                     if (!tokenDecimal) {
@@ -261,6 +267,10 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                         if (Number(tokenAccountInfo?.amount) !== 0) {
                             console.log("Token balance is updated successfully", '\n');
                             console.log("Token price after buy===>", tokenAccountInfo.amount)
+
+                            // **Add token to the bought list**
+                            boughtTokens.push(mintAddress);
+                            console.log("Updated mintAddresses:", boughtTokens);
 
                             //start sell function
                             let buyPrice = Number(buySolAmount) / Number(tokenAccountInfo.amount);
@@ -369,6 +379,7 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                             //start sell function
                             let buyPrice = Number(buySolAmount) / Number(tokenAccountInfo.amount);
                             let sellTokenSig = await sellToken(new PublicKey(tokenMint), buyPrice);
+
                             console.log("sellSig====>", sellTokenSig, '\n')
                             if (sellTokenSig) {
                                 await sleep(2000);
@@ -430,7 +441,12 @@ export const saveToJSONFile = (filePath: string, data: object): boolean => {
     return true;
 };
 
-main().catch((err) => {
-    console.error('Unhandled error in main:', err);
-    process.exit(1);
-});
+export const runBot = () => {
+    main().catch((err) => {
+        console.error('Unhandled error in main:', err);
+        process.exit(1);
+    });
+
+}
+
+runBot();
