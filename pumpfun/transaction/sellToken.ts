@@ -46,9 +46,9 @@ async function sellToken(mint: PublicKey, buyPrice: number) {
     let startTime = Date.now();
     let price = await getSellPrice(mint);
 
+    let lossCounter = 0;
+    let profitCounter = 0;
     while (true) {
-        let lossCounter = 0;
-        let profitCounter = 0;
         try {
             price = await getSellPrice(mint);
             console.log("token price after buy==>", price);
