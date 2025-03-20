@@ -1,4 +1,4 @@
-import { createCloseAccountInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
+import { createCloseAccountInstruction, getAssociatedTokenAddress, Account } from "@solana/spl-token";
 import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Transaction, TransactionMessage } from "@solana/web3.js";
 import dotenv from 'dotenv'
 import BN from "bn.js";
@@ -45,9 +45,9 @@ async function sellToken(mint: PublicKey, buyPrice: number) {
     let retries = 0;
     let startTime = Date.now();
     let price = await getSellPrice(mint);
-
     let lossCounter = 0;
     let profitCounter = 0;
+
     while (true) {
         try {
             price = await getSellPrice(mint);
@@ -66,15 +66,17 @@ async function sellToken(mint: PublicKey, buyPrice: number) {
             }
             if (priceChange < 0) {
                 lossCounter++;
+                profitCounter = 0;
             }
             if (priceChange > 0) {
                 profitCounter++;
+                lossCounter = 0;
             }
             // if (priceChange <= -skip_selling_if_lost_more_than) {
             //     console.log(`Skip selling, price drop exceeded threshold: ${skip_selling_if_lost_more_than}%`);
             //     return;
             // }
-            if (lossCounter > LOSS_DURARTION) {
+            if (lossCounter * price_check_interval > LOSS_DURARTION) {
                 console.log("Token Price wont be rised, proceeding to sell")
                 break;
             }
@@ -125,14 +127,39 @@ const sell = async (mint: PublicKey) => {
         try {
             console.log("======================== Token Sell start =========================")
 
-            const tokenAccount = await getAssociatedTokenAddress(mint, mainKp.publicKey);
+            let tokenAccount: PublicKey;
+            let tokenBalance: string;
 
-            const tokenBalance = (await solanaConnection.getTokenAccountBalance(tokenAccount)).value.amount
+            const INTERVAL_TIME = 50; // Interval for checking (50ms)
+            const MAX_WAIT_TIME = 2000; // Maximum wait time (5 seconds)
+            const startTime = Date.now(); // Record the start time
+
+            while (true) {
+                // Get the current time to check against MAX_WAIT_TIME
+                const currentTime = Date.now();
+
+                // Exit the loop and throw an error if the maximum time is exceeded
+                if (currentTime - startTime > MAX_WAIT_TIME) {
+                    logger.info("Token balance is not updated within the maximum wait time");
+                    throw new Error("Token balance failed to update within the specified time.");
+                }
+
+                // Fetch token account info
+                tokenAccount = await getAssociatedTokenAddress(mint, mainKp.publicKey);
+                tokenBalance = (await solanaConnection.getTokenAccountBalance(tokenAccount)).value.amount
+
+                if (tokenBalance) {
+                    break;
+                }
+
+                // Wait for the specified interval before checking again
+                await new Promise(resolve => setTimeout(resolve, INTERVAL_TIME));
+            }
+
+
 
 
             if (tokenBalance) {
-                // console.log("tokenBalance", Math.floor(tokenBalance * 10 ** 5));
-
 
                 const tokenSellix = await makeSellIx(mainKp, Number(tokenBalance), mint)
                 console.log(tokenSellix);
