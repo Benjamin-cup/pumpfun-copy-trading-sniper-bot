@@ -206,99 +206,99 @@ async function handleData(data: SubscribeUpdate, stream: ClientDuplexStream<Subs
                         console.log("No valid token mint address found.");
                         return;
                     }
-
-                    // **Check if the token has already been bought**
                     if (boughtTokens.includes(mintAddress)) {
                         console.log(`Skipping buy. Already purchased token: ${mintAddress}`);
-                        return;
-                    }
-                    if (!tokenDecimal) {
-                        console.log("No valid token mint address found.");
-                        return;
-                    }
-                    console.log("mintAddress===>", mintAddress);
 
-                    let solBalanceBeforeBuy = await solanaConnection.getBalance(keyPair.publicKey);
+                    } else {
+                        // **Check if the token has already been bought**
 
-                    let buyPumpfunResult = await buyTokenPumpfun(new PublicKey(mintAddress), solPumpfunBuyAmount);
+                        if (!tokenDecimal) {
+                            console.log("No valid token mint address found.");
+                            return;
+                        }
+                        console.log("mintAddress===>", mintAddress);
 
-                    let solBalanceAfterBuy = await solanaConnection.getBalance(keyPair.publicKey);
+                        let solBalanceBeforeBuy = await solanaConnection.getBalance(keyPair.publicKey);
 
-                    buySolAmount = (solBalanceBeforeBuy - solBalanceAfterBuy - (0.000105 + 0.000005 + 0.00203928 + 0.00001003) * 10 ** 9);
-                    tokenMint = mintAddress
-                    try {
+                        let buyPumpfunResult = await buyTokenPumpfun(new PublicKey(mintAddress), solPumpfunBuyAmount);
 
-                        let tokenAccountInfo: any;
-                        const maxRetries = MAX_RETRY;
-                        const delayBetweenRetries = 20; // 20m seconds delay between retries
+                        let solBalanceAfterBuy = await solanaConnection.getBalance(keyPair.publicKey);
 
-                        logger.info('Start get token ata');
-                        const tokenAta = await getAssociatedTokenAddress(new PublicKey(tokenMint), keyPair.publicKey, false);
-                        logger.info('Finish get token ata');
+                        buySolAmount = (solBalanceBeforeBuy - solBalanceAfterBuy - (0.000105 + 0.000005 + 0.00203928 + 0.00001003) * 10 ** 9);
+                        tokenMint = mintAddress
+                        try {
 
-                        for (let attempt = 0; attempt < maxRetries; attempt++) {
-                            try {
-                                tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
-                                break; // Break the loop if fetching the account was successful
-                            } catch (error) {
-                                if (error instanceof Error && error.name === 'TokenAccountNotFoundError') {
-                                    logger.info(`Attempt ${attempt + 1}/${maxRetries}: Associated token account not found, retrying...`);
-                                    if (attempt === maxRetries - 1) {
-                                        logger.error(`Max retries reached. Failed to fetch the token account.`);
+                            let tokenAccountInfo: any;
+                            const maxRetries = MAX_RETRY;
+                            const delayBetweenRetries = 20; // 20m seconds delay between retries
+
+                            logger.info('Start get token ata');
+                            const tokenAta = await getAssociatedTokenAddress(new PublicKey(tokenMint), keyPair.publicKey, false);
+                            logger.info('Finish get token ata');
+
+                            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                                try {
+                                    tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
+                                    break; // Break the loop if fetching the account was successful
+                                } catch (error) {
+                                    if (error instanceof Error && error.name === 'TokenAccountNotFoundError') {
+                                        logger.info(`Attempt ${attempt + 1}/${maxRetries}: Associated token account not found, retrying...`);
+                                        if (attempt === maxRetries - 1) {
+                                            logger.error(`Max retries reached. Failed to fetch the token account.`);
+                                            throw error;
+                                        }
+                                        // Wait before retrying
+                                        await new Promise((resolve) => setTimeout(resolve, delayBetweenRetries));
+                                    } else if (error instanceof Error) {
+                                        logger.error(`Unexpected error while fetching token account: ${error.message}`);
+                                        throw error;
+                                    } else {
+                                        logger.error(`An unknown error occurred: ${String(error)}`);
                                         throw error;
                                     }
-                                    // Wait before retrying
-                                    await new Promise((resolve) => setTimeout(resolve, delayBetweenRetries));
-                                } else if (error instanceof Error) {
-                                    logger.error(`Unexpected error while fetching token account: ${error.message}`);
-                                    throw error;
-                                } else {
-                                    logger.error(`An unknown error occurred: ${String(error)}`);
-                                    throw error;
                                 }
                             }
-                        }
 
-                        // const tokenAta = await getAssociatedTokenAddress(tokenMint, keyPair.publicKey);
-                        // const tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
-                        // console.log("🚀 ~ tokenInfo:", tokenAccountInfo);
-                        // console.log("🚀 ~ tokenBalance:", tokenAccountInfo.amount);
+                            // const tokenAta = await getAssociatedTokenAddress(tokenMint, keyPair.publicKey);
+                            // const tokenAccountInfo = await getAccount(solanaConnection, tokenAta);
+                            // console.log("🚀 ~ tokenInfo:", tokenAccountInfo);
+                            // console.log("🚀 ~ tokenBalance:", tokenAccountInfo.amount);
 
-                        if (Number(tokenAccountInfo?.amount) !== 0) {
-                            console.log("Token balance is updated successfully", '\n');
-                            console.log("Token price after buy===>", tokenAccountInfo.amount)
+                            if (Number(tokenAccountInfo?.amount) !== 0) {
+                                console.log("Token balance is updated successfully", '\n');
+                                console.log("Token price after buy===>", tokenAccountInfo.amount)
 
-                            // **Add token to the bought list**
-                            boughtTokens.push(mintAddress);
-                            console.log("Updated mintAddresses:", boughtTokens);
+                                // **Add token to the bought list**
+                                boughtTokens.push(mintAddress);
+                                console.log("Updated mintAddresses:", boughtTokens);
 
-                            //start sell function
-                            let buyPrice = Number(buySolAmount) / Number(tokenAccountInfo.amount);
-                            let sellTokenSig = await sellToken(new PublicKey(tokenMint), buyPrice);
-                            console.log("sellSig====>", sellTokenSig, '\n')
-                            if (sellTokenSig) {
-                                await sleep(2000);
+                                //start sell function
+                                let buyPrice = Number(buySolAmount) / Number(tokenAccountInfo.amount);
+                                let sellTokenSig = await sellToken(new PublicKey(tokenMint), buyPrice);
+                                console.log("sellSig====>", sellTokenSig, '\n')
+                                if (sellTokenSig) {
+                                    await sleep(2000);
+                                }
+                                else {
+                                    await sellToken(new PublicKey(tokenMint), buyPrice);
+                                    await sellWithJupiter(new PublicKey(tokenMint))
+
+                                }
+                                isStopped = false;
+
+                                return true; // Token balance is updated successfully
+
+                            } else {
+                                console.log("Token balance is not updated", '\n');
+                                return false; // Token balance is not updated
                             }
-                            else {
-                                await sellToken(new PublicKey(tokenMint), buyPrice);
-                                await sellWithJupiter(new PublicKey(tokenMint))
 
-                            }
-                            isStopped = false;
 
-                            return true; // Token balance is updated successfully
-
-                        } else {
-                            console.log("Token balance is not updated", '\n');
-                            return false; // Token balance is not updated
+                        } catch (error) {
+                            console.log(error)
+                            console.log("--------------------- Pumpfun transactio fail ---------------------")
                         }
-
-
-                    } catch (error) {
-                        console.log(error)
-                        console.log("--------------------- Pumpfun transactio fail ---------------------")
                     }
-
                 } catch (error) {
                     console.log(error);
                     console.log("--------------------- Pumpfun transactio fail ---------------------")
