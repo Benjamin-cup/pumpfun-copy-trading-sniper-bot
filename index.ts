@@ -125,7 +125,6 @@ function sendSubscribeRequest(
     });
 }
 
-
 function handleStreamEvents(stream: ClientDuplexStream<SubscribeRequest, SubscribeUpdate>): Promise<void> {
     return new Promise<void>((resolve, reject) => {
         stream.on('data', async (data) => {
@@ -146,7 +145,6 @@ function handleStreamEvents(stream: ClientDuplexStream<SubscribeRequest, Subscri
         });
     });
 }
-
 
 let isStopped = false;
 const boughtTokens: string[] = [];
