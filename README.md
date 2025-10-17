@@ -1,4 +1,4 @@
-# Pumpfun(pump.fun)-Smart-Contract && Raydium launchlab smart contract
+# Pumpfun (Pump.fun) Smart Contract & Raydium LaunchLab Smart Contract
 
   Pumpfun(pump.fun) smart contract and raydium launchlab smart contract with the Rust/Anchor - Add virtual LP, remove LP, create Raydium Pool AMM and CPMM(Pump.fun forking).
 
@@ -8,13 +8,10 @@
 
   Ongoing updated version: Swap on **PumpSwap**(private)
 
-## Contact
-
-  If you wanna build more better, contact here: [Telegram](https://t.me/shiny0103) | [Twitter](https://x.com/0xTan1319)
 
 ## Differences Between Pumpfun Smart Contract and Raydium Launchlab
 
-The Pumpfun smart contract and Raydium Launchlab are both designed as memecoin launchpads utilizing bonding curves. However, they differ in their features and functionalities, catering to varying needs of token developers and investors.
+Pumpfun Smart Contract and Raydium Launchlab are both designed as memecoin launchpads utilizing bonding curves. However, each platform has different functions and roles, catering to the diverse needs of token developers and investors.
 
 ### Pumpfun Smart Contract
 
@@ -41,16 +38,6 @@ Raydium Launchlab enhances the standard launchpad experience with additional, ad
 
 In summary, while both platforms serve as essential tools for launching memecoins, the Raydium Launchlab provides robust features like token vesting and migration options, making it more suitable for developers who seek greater control over their token distributions and exit strategies. In contrast, Pumpfun emphasizes simplicity in launching new tokens, appealing to developers who prioritize a straightforward, user-friendly approach.
 
-## Related repository
-  You can check frontend and backend repo in my github as well.
-  
-  [Pumpfun Backend repo](https://github.com/0xTan1319/Pump-Fun-Backend)
-  
-  [Pumpfun Frontend repo](https://github.com/0xTan1319/Pump-Fun-FE)
-
-## Contribution
-
-  Please use it and give me star and follow me on github.
 
 ## Check Here
 
@@ -65,15 +52,7 @@ In summary, while both platforms serve as essential tools for launching memecoin
   - Similar with original pump.fun contract address: `https://solscan.io/account/BCdbBhYrRfd17MBGeompteXDgoBFxgnfQh2NkdgJQk5w?cluster=devnet`
 
   - Pumpfun + spl NFT contract address: `https://solscan.io/account/4m3GTSWQ6AUvvF4PmdiYd1Nsq4sFdLaq5n9jdQrzCBBM?cluster=devnet`
-
-### Live url
-
-  1. [pumpfun forking redesign](https://agents.land/)
   
-  2. [pumpfun + spl nft](https://256btc.com)
-
-  3. [Multi language version](https://geng.one)
-     
 ### Update result
 
   - Fee distribution
@@ -87,3 +66,19 @@ In summary, while both platforms serve as essential tools for launching memecoin
     <a href="https://ibb.co/j9M7GvBR"><img src="https://i.ibb.co/j9M7GvBR/buy-viper.png" alt="buy-viper" border="0"></a>
 
   - Contract Addr: https://solscan.io/account/AyptQDLRDKRQmi6KzxMyGKcmA8AEcgPzYCmoHBnGui3z?cluster=devnet
+
+
+## Related repository
+  You can check frontend and backend repo in my github as well.
+  
+  [Pumpfun Backend repo](https://github.com/Benjamin-cup/Pumpfun-Backend)
+  
+  [Pumpfun Frontend repo](https://github.com/Benjamin-cup/Pumpfun-Frontend)
+
+## Contact
+
+If you wanna build more better, contact here: [Telegram](https://t.me/erikerik116) | [Twitter](https://x.com/erikerikerik116)
+
+## Contribution
+
+  Please use it and give me star and follow me on github.
