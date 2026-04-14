@@ -1,84 +1,213 @@
-# Pumpfun (Pump.fun) Smart Contract & Raydium LaunchLab Smart Contract
+# Polymarket split → monitor → redeem
 
-  Pumpfun(pump.fun) smart contract and raydium launchlab smart contract with the Rust/Anchor - Add virtual LP, remove LP, create Raydium Pool AMM and CPMM(Pump.fun forking).
+Splits USDC.e into YES/NO conditional tokens, polls the public order book until the epoch ends (no CLOB sells), then redeems winning shares via the builder-relayer.
 
-  New updated version: migrate to Pumpfun AMM pool and support token 2022 and fee distribution.
+## Strategy
 
-  New update version: add token vesting and migrate method (AMM or CPMM) - forking raydium launchlab.  
+```
+IDLE → SPLIT → MONITOR → REDEEM → IDLE
+```
 
-  Ongoing updated version: Swap on **PumpSwap**(private)
+1. **SPLIT** — Convert USDC.e into YES + NO outcome tokens via CTF `splitPosition`
+2. **MONITOR** — Poll YES/NO best bids (no orders placed or cancelled)
+3. **REDEEM** — Redeem winning tokens → USDC.e via builder-relayer (gasless)
 
+Runs across multiple markets and intervals in parallel (BTC, ETH, SOL, XRP × 5m, 15m).
 
-## Differences Between Pumpfun Smart Contract and Raydium Launchlab
+## Setup
 
-Pumpfun Smart Contract and Raydium Launchlab are both designed as memecoin launchpads utilizing bonding curves. However, each platform has different functions and roles, catering to the diverse needs of token developers and investors.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[relayer]"
+```
 
-### Pumpfun Smart Contract
+Copy `.env.example` to `.env` and fill in credentials:
 
-The Pumpfun smart contract is focused on creating a straightforward and efficient environment for launching new memecoins. It supports key functionalities such as:
+```bash
+cp .env.example .env
+```
 
-- **Virtual Liquidity Pool (LP) Operations**: Users can easily add or remove liquidity to help create a vibrant trading environment.
-- **Integration with AMM and CPMM**: The contract features robust mechanisms for Automated Market Makers (AMM) and Constant Product Market Makers (CPMM), ensuring fair pricing and smooth transactions.
+Required credentials:
+- **Wallet** — `PRIVATE_KEY` (and `FUNDER` if your setup requires it)
+- **Builder-Relayer** — `BUILDER_API_KEY`, `BUILDER_API_SECRET`, `BUILDER_API_PASSPHRASE` (split + redeem)
 
-### Raydium Launchlab
+## Configuration
 
-Raydium Launchlab enhances the standard launchpad experience with additional, advanced features:
+**`config/default.yaml`** — Bot settings, execution credentials, liquidity maker parameters.
 
-- **Token Vesting**: This feature allows token developers to set up vesting schedules for their tokens, ensuring that tokens are released gradually over time to prevent market flooding and to enhance investor confidence.
-- **Migration Options**: Raydium Launchlab supports migration features that enable developers to transition their projects seamlessly to new smart contracts or methodologies, offering greater flexibility and adaptability within their growth strategies.
+Target assets and interval (all symbols share one `epoch`):
 
-### Key Comparisons
+```yaml
+liquidity_maker:
+  epoch: 5m
+  symbols: [btc, sol, eth]
+```
 
-| Feature                   | Pumpfun Smart Contract         | Raydium Launchlab             |
-|---------------------------|--------------------------------|-------------------------------|
-| Virtual LP Operations      | Yes                            | Yes                           |
-| Token Vesting              | No                             | Yes                           |
-| Migration Options          | No                             | Yes                           |
-| AMM/CPMM Support           | Yes                            | Yes                           |
+You can also use a YAML list:
 
-In summary, while both platforms serve as essential tools for launching memecoins, the Raydium Launchlab provides robust features like token vesting and migration options, making it more suitable for developers who seek greater control over their token distributions and exit strategies. In contrast, Pumpfun emphasizes simplicity in launching new tokens, appealing to developers who prioritize a straightforward, user-friendly approach.
+```yaml
+  symbols:
+    - btc
+    - sol
+    - eth
+```
 
+**Legacy:** if `symbols` is omitted or empty, you can set explicit rows with `markets` (different epoch per row):
 
-## Check Here
+```yaml
+  markets:
+    - { symbol: btc, epoch: 5m }
+    - { symbol: eth, epoch: 15m }
+```
 
-  You can check the tx to Remove vitual LP and Create Raydium Pool in this smart contract with CPI calls.  
-  
-  https://explorer.solana.com/tx/4L6MWmtV1ZsT8NFfbtu68ZYyYVbpvZ4iynJhPdZw8jESi28TxwojjTFs88Q5QRdNUb297aWfkKcoYP9Ya8npx8AV?cluster=devnet
-  
-  In fact, in this project, set creating LP FEE as 5% of Reserves.
+If `symbols` is non-empty, it overrides and fills `markets` using `epoch`.
 
-### Another Versions
+Key parameters in `liquidity_maker`:
+- `portfolio_allocation_usdc` — USDC.e to split per market/epoch (default: 1000)
+- `monitor_poll_interval_s` / `monitor_log_interval_s` — Order book polling and `[MARKET]` log cadence
+- `redeem_delay_seconds` — Wait after resolution before redeeming (default: 120)
+- `cycles` — Number of cycles to run (0 = forever)
 
-  - Similar with original pump.fun contract address: `https://solscan.io/account/BCdbBhYrRfd17MBGeompteXDgoBFxgnfQh2NkdgJQk5w?cluster=devnet`
+## Usage
 
-  - Pumpfun + spl NFT contract address: `https://solscan.io/account/4m3GTSWQ6AUvvF4PmdiYd1Nsq4sFdLaq5n9jdQrzCBBM?cluster=devnet`
-  
-### Update result
+```bash
+# Run with CLI
+polybot5m run
 
-  - Fee distribution
+# Dry run (no split/redeem on chain)
+polybot5m run --dry-run
 
-    Users can set buy/sell fee and they will receive half fee as well.
+# Paper — no chain; polls real order book until epoch end; PNL assumes full YES/NO inventory
+polybot5m run --paper
 
-    Like this, i can distribute fee dev team and user or any other options and it will be more great for token safety.
+# Custom allocation and cycles
+polybot5m run --allocation 500 --cycles 5
 
-    Tx: https://solscan.io/tx/4e25Sv3rDS9rqb9pXyoYwHRtXhnteTGZCGyrchcPwHoKFCNVS2v2aEy6UVXqHQDnVxsCSuBgK2DUcg3NmHizM1b1?cluster=devnet
+# Via script
+python scripts/run_liquidity_maker.py run
+python scripts/run_liquidity_maker.py run --dry-run --cycles 1
+```
 
-    <a href="https://ibb.co/j9M7GvBR"><img src="https://i.ibb.co/j9M7GvBR/buy-viper.png" alt="buy-viper" border="0"></a>
+### Paper mode
 
-  - Contract Addr: https://solscan.io/account/AyptQDLRDKRQmi6KzxMyGKcmA8AEcgPzYCmoHBnGui3z?cluster=devnet
+No on-chain split or redeem. The bot polls the **public** order book until the epoch ends, then writes a paper PNL report assuming you hold the full YES and NO split size (no simulated sells).
 
+- Outputs to `exports/paper_summary_{timestamp}.json` and `exports/paper_pnl_{timestamp}.csv`
 
-## Related repository
-  You can check frontend and backend repo in my github as well.
-  
-  [Pumpfun Backend repo](https://github.com/Benjamin-cup/Pumpfun-Backend)
-  
-  [Pumpfun Frontend repo](https://github.com/Benjamin-cup/Pumpfun-Frontend)
+No wallet or relayer credentials needed for paper mode.
 
-## Contact
+### Standalone Redeem
 
-If you wanna build more better, contact here: [Telegram](https://t.me/erikerik116) | [Twitter](https://x.com/erikerikerik116)
+```bash
+python scripts/test_redeem.py --condition-id 0x...
+python scripts/test_redeem.py --from-export exports --last 5
+```
 
-## Contribution
+### Derive Credentials
 
-  Please use it and give me star and follow me on github.
+```bash
+python scripts/derive_polymarket_creds.py
+```
+
+## Architecture
+
+```
+src/polybot5m/
+├── cli.py              # Click CLI entry point
+├── config.py           # Settings (YAML + env + TOML markets)
+├── constants.py        # Contract addresses, intervals
+├── engine.py           # Liquidity maker state machine
+├── data/
+│   ├── gamma.py        # Gamma API (event/market discovery)
+│   ├── clob_ws.py      # CLOB WebSocket (orderbook)
+│   ├── clob_rest.py    # Public REST API (order book fetch for paper trading)
+│   ├── orderbook.py    # In-memory orderbook store
+│   ├── slug_builder.py # Epoch slug computation
+│   └── models.py       # Pydantic models (Event, Market)
+└── execution/
+    ├── executor.py     # Order book monitor
+    ├── split.py        # CTF splitPosition via relayer
+    ├── redeem.py       # CTF redeemPositions via relayer
+    ├── paper_exchange.py # Virtual orders for paper trading
+    └── paper_report.py  # PNL summary and export (JSON/CSV)
+```
+
+## How It Works
+
+For each market (e.g. BTC-5m) per epoch:
+
+1. Compute epoch slug → fetch event from Gamma API → get condition_id + asset_ids
+2. Call CTF `splitPosition` via builder-relayer to convert USDC.e → YES tokens + NO tokens
+3. Poll the public order book until the epoch ends (no CLOB orders)
+4. Redeem winning outcome tokens → USDC.e
+
+At resolution, one side pays $1 per share held.
+
+## Testing
+
+### Dry Run (No Transactions)
+
+```bash
+polybot5m run --dry-run --cycles 1
+```
+
+Logs dry-run split/monitor/redeem for each market. No on-chain transactions.
+
+### Config Validation
+
+```bash
+python3 -c "
+from polybot5m.config import load_config
+cfg = load_config()
+print('allocation:', cfg.liquidity_maker.portfolio_allocation_usdc)
+print('markets:', [(m.symbol, m.epoch) for m in cfg.liquidity_maker.markets])
+"
+```
+
+### Slug + Gamma Fetch
+
+```bash
+python3 -c "
+import asyncio, aiohttp
+from polybot5m.data.gamma import GammaClient
+from polybot5m.data.slug_builder import compute_epoch_slugs
+
+async def test():
+    slugs = compute_epoch_slugs('btc', '5m')
+    async with aiohttp.ClientSession() as s:
+        g = GammaClient('https://gamma-api.polymarket.com', s)
+        event = await g.fetch_event_by_slug(slugs.current_slug)
+        print('title:', event.title)
+        print('asset_ids:', len(event.all_asset_ids()))
+        print('condition_id:', event.markets[0].condition_id[:32] + '...')
+asyncio.run(test())
+"
+```
+
+### Live Single-Cycle Test
+
+```bash
+polybot5m run --cycles 1 --allocation 1
+```
+
+Splits $1 USDC.e, monitors the book until resolution, redeems. Check `exports/liquidity_maker_activity.json`.
+
+### Standalone Redeem
+
+```bash
+python scripts/test_redeem.py --condition-id 0x...
+python scripts/test_redeem.py --from-export exports --last 5
+```
+
+### Troubleshooting
+
+- **"Relayer deps missing"** — Run `pip install -e ".[relayer]"`
+- **"No markets found"** — Set `liquidity_maker.symbols` or `liquidity_maker.markets` in `config/default.yaml`
+- **Rate limit errors** — Add more builder API credentials (`_KEY_1..N` in `.env`)
+- **Split fails with approval error** — Ensure `split_approve_first: true` in config
+- **Missing credentials** — Set `POLYBOT5M_EXECUTION__*` in `.env` or config
+
+## Logging
+
+Activity is exported to `exports/liquidity_maker_activity.json` with records for splits and redeems.
